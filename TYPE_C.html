@@ -1,0 +1,2436 @@
+```html id="m4zq8p"
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TP4056 Connection Lab 3D</title>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#0d1116;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+canvas{
+    display:block;
+}
+
+#ui{
+    position:fixed;
+    left:0;
+    right:0;
+    top:0;
+    z-index:100;
+
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+
+    min-height:70px;
+    padding:10px 14px;
+
+    background:rgba(10,13,17,.94);
+    border-bottom:1px solid #3b4249;
+
+    color:white;
+}
+
+#logo{
+    font-size:20px;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+.box{
+    padding:8px 11px;
+    border-radius:8px;
+
+    background:#1c2126;
+    border:1px solid #41484f;
+
+    font-size:14px;
+}
+
+#message{
+    margin-left:auto;
+}
+
+button{
+    padding:9px 13px;
+    border:0;
+    border-radius:8px;
+
+    background:#1976d2;
+    color:white;
+
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#2888e4;
+}
+
+#help{
+    position:fixed;
+    left:14px;
+    bottom:14px;
+    z-index:100;
+
+    padding:10px 12px;
+
+    color:#ddd;
+    background:rgba(10,13,17,.86);
+
+    border:1px solid #41484f;
+    border-radius:9px;
+
+    font-size:12px;
+    line-height:1.55;
+}
+
+#loading{
+    position:fixed;
+    inset:0;
+    z-index:500;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    background:#0d1116;
+    color:white;
+
+    font-size:20px;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">
+    3D Laboratuvar yükleniyor...
+</div>
+
+<div id="ui">
+
+    <div id="logo">
+        🔌 TP4056 LAB
+    </div>
+
+    <div class="box">
+        Görev:
+        <b id="task">—</b>
+    </div>
+
+    <div class="box">
+        Skor:
+        <b id="score">0</b>
+    </div>
+
+    <div class="box">
+        <b id="deviceName">Cihaz</b>
+    </div>
+
+    <div class="box" id="message">
+        Kabloyu tak
+    </div>
+
+    <button id="newRound">
+        Yeni Tur
+    </button>
+
+</div>
+
+<div id="help">
+    🖱️ Sürükle: kamera<br>
+    🖱️ Tekerlek: zoom<br>
+    🔌 Kablo ucunu sürükle
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+
+if(typeof THREE==="undefined"){
+
+    document.getElementById("loading")
+        .textContent =
+        "Three.js yüklenemedi. İnterneti kontrol et.";
+
+    throw new Error(
+        "Three.js bulunamadı."
+    );
+}
+
+
+/* =====================================================
+   SAHNE
+===================================================== */
+
+const scene =
+    new THREE.Scene();
+
+scene.background =
+    new THREE.Color(0x10151a);
+
+scene.fog =
+    new THREE.Fog(
+        0x10151a,
+        15,
+        34
+    );
+
+
+/* =====================================================
+   KAMERA
+===================================================== */
+
+const camera =
+    new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth /
+        window.innerHeight,
+        0.1,
+        100
+    );
+
+camera.position.set(
+    0,
+    7.5,
+    15
+);
+
+camera.lookAt(
+    0,
+    1,
+    0
+);
+
+
+/* =====================================================
+   RENDER
+===================================================== */
+
+const renderer =
+    new THREE.WebGLRenderer({
+        antialias:true
+    });
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.setPixelRatio(
+    Math.min(
+        window.devicePixelRatio,
+        2
+    )
+);
+
+renderer.shadowMap.enabled=true;
+
+renderer.shadowMap.type =
+    THREE.PCFSoftShadowMap;
+
+document.body.appendChild(
+    renderer.domElement
+);
+
+
+/* =====================================================
+   IŞIK
+===================================================== */
+
+scene.add(
+    new THREE.HemisphereLight(
+        0xffffff,
+        0x242a30,
+        1.8
+    )
+);
+
+const keyLight =
+    new THREE.DirectionalLight(
+        0xffffff,
+        2.8
+    );
+
+keyLight.position.set(
+    4,
+    12,
+    7
+);
+
+keyLight.castShadow=true;
+
+keyLight.shadow.mapSize.width=2048;
+keyLight.shadow.mapSize.height=2048;
+
+scene.add(keyLight);
+
+const blueLight =
+    new THREE.PointLight(
+        0x4c9cff,
+        30,
+        22
+    );
+
+blueLight.position.set(
+    -5,
+    5,
+    4
+);
+
+scene.add(blueLight);
+
+
+/* =====================================================
+   MASA
+===================================================== */
+
+const desk =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            25,
+            .5,
+            17
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x555b60,
+            roughness:.92,
+            metalness:.05
+        })
+    );
+
+desk.position.y=-.45;
+
+desk.receiveShadow=true;
+
+scene.add(desk);
+
+const grid =
+    new THREE.GridHelper(
+        24,
+        24,
+        0x777b7e,
+        0x3e4246
+    );
+
+grid.position.y=-.19;
+
+scene.add(grid);
+
+
+/* =====================================================
+   TP4056 KARTI
+===================================================== */
+
+const tp =
+    new THREE.Group();
+
+tp.position.set(
+    -4.4,
+    .35,
+    .2
+);
+
+scene.add(tp);
+
+
+/* PCB */
+
+const pcb =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            5.2,
+            .22,
+            3.15
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x0879c8,
+            roughness:.47,
+            metalness:.18
+        })
+    );
+
+pcb.castShadow=true;
+pcb.receiveShadow=true;
+
+tp.add(pcb);
+
+
+/* Kenar */
+
+const pcbEdge =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            4.92,
+            .08,
+            2.88
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x075384,
+            roughness:.65
+        })
+    );
+
+pcbEdge.position.y=-.15;
+
+tp.add(pcbEdge);
+
+
+/* =====================================================
+   ÇİP
+===================================================== */
+
+const chargerChip =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            1.15,
+            .28,
+            .9
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x111214,
+            roughness:.2,
+            metalness:.55
+        })
+    );
+
+chargerChip.position.set(
+    -.25,
+    .29,
+    -.05
+);
+
+chargerChip.castShadow=true;
+
+tp.add(chargerChip);
+
+
+/* Chip pinleri */
+
+for(let i=0;i<5;i++){
+
+    const pin =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                .07,
+                .08,
+                .28
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0xbfc1c3,
+                metalness:.9,
+                roughness:.18
+            })
+        );
+
+    pin.position.set(
+        -.64+i*.32,
+        .34,
+        -.68
+    );
+
+    tp.add(pin);
+}
+
+
+/* =====================================================
+   DİRENÇLER
+===================================================== */
+
+function createResistor(
+    x,
+    z,
+    rot=0
+){
+
+    const body =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                .62,
+                .13,
+                .18
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0xd6bb8d,
+                roughness:.7
+            })
+        );
+
+    body.position.set(
+        x,
+        .24,
+        z
+    );
+
+    body.rotation.y=
+        rot;
+
+    tp.add(body);
+
+    for(
+        const offset of [-.22,.22]
+    ){
+
+        const metal =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    .12,
+                    .06,
+                    .07
+                ),
+                new THREE.MeshStandardMaterial({
+                    color:0xb9b9b9,
+                    metalness:.9,
+                    roughness:.18
+                })
+            );
+
+        metal.position.set(
+            x+Math.cos(rot)*offset,
+            .24,
+            z+Math.sin(rot)*offset
+        );
+
+        tp.add(metal);
+    }
+}
+
+createResistor(
+    -1.65,
+    -.55
+);
+
+createResistor(
+    -1.65,
+    -.18,
+    Math.PI/2
+);
+
+createResistor(
+    .95,
+    .3
+);
+
+
+/* =====================================================
+   KAPASİTÖRLER
+===================================================== */
+
+function createCapacitor(
+    x,
+    z
+){
+
+    const cap =
+        new THREE.Mesh(
+            new THREE.CylinderGeometry(
+                .12,
+                .12,
+                .36,
+                18
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0x222326,
+                roughness:.4,
+                metalness:.2
+            })
+        );
+
+    cap.position.set(
+        x,
+        .37,
+        z
+    );
+
+    tp.add(cap);
+
+    const top =
+        new THREE.Mesh(
+            new THREE.CylinderGeometry(
+                .1,
+                .1,
+                .015,
+                18
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0xb4b7bb,
+                metalness:.8
+            })
+        );
+
+    top.position.set(
+        x,
+        .56,
+        z
+    );
+
+    tp.add(top);
+}
+
+createCapacitor(
+    -1.3,
+    .55
+);
+
+createCapacitor(
+    .55,
+    .55
+);
+
+
+/* =====================================================
+   LEDLER
+===================================================== */
+
+const redLED =
+    new THREE.Mesh(
+        new THREE.SphereGeometry(
+            .13,
+            20,
+            20
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0xff2222,
+            emissive:0x770000,
+            emissiveIntensity:1
+        })
+    );
+
+redLED.position.set(
+    1.75,
+    .3,
+    -.48
+);
+
+tp.add(redLED);
+
+
+const greenLED =
+    new THREE.Mesh(
+        new THREE.SphereGeometry(
+            .13,
+            20,
+            20
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x253529,
+            emissive:0x003b0b
+        })
+    );
+
+greenLED.position.set(
+    1.75,
+    .3,
+    -.12
+);
+
+tp.add(greenLED);
+
+
+/* =====================================================
+   USB-C SOKET
+===================================================== */
+
+const usbHousing =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            1.55,
+            .6,
+            .7
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x202429,
+            roughness:.35,
+            metalness:.75
+        })
+    );
+
+usbHousing.position.set(
+    0,
+    .48,
+    -1.7
+);
+
+usbHousing.castShadow=true;
+
+tp.add(usbHousing);
+
+
+const usbHole =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            1.1,
+            .28,
+            .75
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x030303,
+            roughness:.5
+        })
+    );
+
+usbHole.position.set(
+    0,
+    .43,
+    -2.03
+);
+
+tp.add(usbHole);
+
+
+const usbTongue =
+    new THREE.Mesh(
+        new THREE.BoxGeometry(
+            .68,
+            .07,
+            .35
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0xb5b8bb,
+            metalness:.95,
+            roughness:.12
+        })
+    );
+
+usbTongue.position.set(
+    0,
+    .44,
+    -2.08
+);
+
+tp.add(usbTongue);
+
+
+/* =====================================================
+   B+ B- D+ D-
+===================================================== */
+
+const connectionPositions={
+
+    Bplus:
+        new THREE.Vector3(
+            -1.95,
+            .28,
+            .95
+        ),
+
+    Bminus:
+        new THREE.Vector3(
+            -1.30,
+            .28,
+            .95
+        ),
+
+    Dplus:
+        new THREE.Vector3(
+            1.30,
+            .28,
+            .95
+        ),
+
+    Dminus:
+        new THREE.Vector3(
+            1.95,
+            .28,
+            .95
+        )
+};
+
+const connectionPads={};
+
+
+function createConnectionPad(
+    type
+){
+
+    const pad =
+        new THREE.Mesh(
+            new THREE.CylinderGeometry(
+                .17,
+                .17,
+                .09,
+                24
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0xbfc0c1,
+                metalness:.88,
+                roughness:.2
+            })
+        );
+
+    pad.rotation.x=
+        Math.PI/2;
+
+    pad.position.copy(
+        connectionPositions[type]
+    );
+
+    tp.add(pad);
+
+    connectionPads[type]=pad;
+}
+
+
+for(
+    const type in connectionPositions
+){
+
+    createConnectionPad(
+        type
+    );
+}
+
+
+/* =====================================================
+   CİHAZ
+===================================================== */
+
+const device =
+    new THREE.Group();
+
+device.position.set(
+    4.3,
+    1.0,
+    .2
+);
+
+scene.add(device);
+
+let deviceParts=[];
+
+
+/* =====================================================
+   EKRAN TEXTURE
+===================================================== */
+
+const displayCanvas=
+    document.createElement(
+        "canvas"
+    );
+
+displayCanvas.width=700;
+displayCanvas.height=380;
+
+const displayCtx=
+    displayCanvas.getContext(
+        "2d"
+    );
+
+const displayTexture=
+    new THREE.CanvasTexture(
+        displayCanvas
+    );
+
+function setDisplay(
+    text
+){
+
+    displayCtx.fillStyle=
+        "#061014";
+
+    displayCtx.fillRect(
+        0,
+        0,
+        700,
+        380
+    );
+
+    displayCtx.fillStyle=
+        "#6edcff";
+
+    displayCtx.font=
+        "bold 55px Arial";
+
+    displayCtx.textAlign=
+        "center";
+
+    displayCtx.textBaseline=
+        "middle";
+
+    displayCtx.fillText(
+        text,
+        350,
+        190
+    );
+
+    displayTexture.needsUpdate=
+        true;
+}
+
+
+/* =====================================================
+   CIHAZ PORTLARI
+===================================================== */
+
+const devicePorts={};
+
+const targetLocalPositions={
+
+    Bplus:
+        new THREE.Vector3(
+            -1.05,
+            -0.35,
+            3
+        ),
+
+    Bminus:
+        new THREE.Vector3(
+            -.35,
+            -0.35,
+            3
+        ),
+
+    Dplus:
+        new THREE.Vector3(
+            .35,
+            -0.35,
+            3
+        ),
+
+    Dminus:
+        new THREE.Vector3(
+            1.05,
+            -0.35,
+            3
+        )
+};
+
+function createDevicePorts(){
+
+    const shell=
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                2.8,
+                .58,
+                .45
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0x16181a,
+                metalness:.8,
+                roughness:.2
+            })
+        );
+
+    shell.position.set(
+        0,
+        -.35,
+        2.92
+    );
+
+    device.add(shell);
+    deviceParts.push(shell);
+
+
+    for(
+        const type in targetLocalPositions
+    ){
+
+        const port=
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    .36,
+                    .2,
+                    .12
+                ),
+                new THREE.MeshStandardMaterial({
+                    color:0x565b60,
+                    metalness:.85,
+                    roughness:.2
+                })
+            );
+
+        port.position.copy(
+            targetLocalPositions[type]
+        );
+
+        device.add(port);
+
+        devicePorts[type]=
+            port;
+
+        deviceParts.push(port);
+    }
+}
+
+
+/* =====================================================
+   EKRAN
+===================================================== */
+
+const deviceScreen=
+    new THREE.Mesh(
+        new THREE.PlaneGeometry(
+            3.25,
+            1.7
+        ),
+        new THREE.MeshBasicMaterial({
+            map:displayTexture
+        })
+    );
+
+deviceScreen.position.set(
+    0,
+    .38,
+    2.96
+);
+
+device.add(deviceScreen);
+
+
+/* =====================================================
+   CİHAZ OLUŞTURMA
+===================================================== */
+
+let currentDevice=null;
+
+function clearDevice(){
+
+    while(device.children.length){
+
+        const object=
+            device.children[
+                device.children.length-1
+            ];
+
+        device.remove(
+            object
+        );
+
+        if(object.geometry)
+            object.geometry.dispose();
+
+        if(object.material)
+            object.material.dispose();
+    }
+
+    devicePorts.Bplus=null;
+    devicePorts.Bminus=null;
+    devicePorts.Dplus=null;
+    devicePorts.Dminus=null;
+}
+
+
+/* Genel cihaz parçaları */
+
+function makeBody(
+    width,
+    height,
+    depth,
+    color,
+    radius=0
+){
+
+    const body=
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                width,
+                height,
+                depth
+            ),
+            new THREE.MeshStandardMaterial({
+                color,
+                roughness:.38,
+                metalness:.42
+            })
+        );
+
+    body.castShadow=true;
+    body.receiveShadow=true;
+
+    if(radius)
+        body.geometry.translate(
+            0,0,0
+        );
+
+    device.add(body);
+
+    return body;
+}
+
+
+/* Telefon */
+
+function buildPhone(){
+
+    const body=
+        makeBody(
+            4.4,
+            .85,
+            6.5,
+            0x252a30
+        );
+
+    body.position.y=
+        .05;
+
+    const rim=
+        makeBody(
+            4.15,
+            .18,
+            6.2,
+            0x111316
+        );
+
+    rim.position.y=
+        .5;
+
+    createDevicePorts();
+}
+
+
+/* Tablet */
+
+function buildTablet(){
+
+    const body=
+        makeBody(
+            5.5,
+            .72,
+            7.5,
+            0x43484d
+        );
+
+    body.position.y=
+        .02;
+
+    const back=
+        makeBody(
+            5.15,
+            .12,
+            7.15,
+            0x1b1e21
+        );
+
+    back.position.y=
+        .42;
+
+    createDevicePorts();
+}
+
+
+/* Laptop */
+
+function buildLaptop(){
+
+    const base=
+        makeBody(
+            7,
+            .55,
+            5.1,
+            0x666c71
+        );
+
+    base.position.y=
+        -.1;
+
+    const screenFrame=
+        makeBody(
+            6.6,
+            4.0,
+            .35,
+            0x30353a
+        );
+
+    screenFrame.position.set(
+        0,
+        1.7,
+        1.9
+    );
+
+    screenFrame.rotation.x=
+        -.15;
+
+    const keyboard=
+        makeBody(
+            5.5,
+            .08,
+            2.6,
+            0x24282c
+        );
+
+    keyboard.position.set(
+        0,
+        .23,
+        .45
+    );
+
+    createDevicePorts();
+}
+
+
+/* Saat */
+
+function buildWatch(){
+
+    const body=
+        makeBody(
+            2.8,
+            .62,
+            2.8,
+            0x191c20
+        );
+
+    body.position.y=
+        .05;
+
+    const face=
+        new THREE.Mesh(
+            new THREE.CylinderGeometry(
+                1.02,
+                1.02,
+                .12,
+                48
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0x111315,
+                roughness:.2,
+                metalness:.5
+            })
+        );
+
+    face.rotation.x=
+        Math.PI/2;
+
+    face.position.set(
+        0,
+        .45,
+        1.43
+    );
+
+    device.add(face);
+
+    createDevicePorts();
+}
+
+
+/* Pil */
+
+function buildBattery(){
+
+    const body=
+        makeBody(
+            5.2,
+            1.45,
+            3.6,
+            0x24282c
+        );
+
+    body.position.y=
+        0;
+
+    const cap=
+        makeBody(
+            4.7,
+            .15,
+            .75,
+            0x111214
+        );
+
+    cap.position.y=
+        .78;
+
+    createDevicePorts();
+}
+
+
+/* Mouse */
+
+function buildMouse(){
+
+    const body=
+        new THREE.Mesh(
+            new THREE.SphereGeometry(
+                2.0,
+                32,
+                18
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0x33383d,
+                roughness:.35,
+                metalness:.3
+            })
+        );
+
+    body.scale.set(
+        1,
+        .58,
+        1.35
+    );
+
+    body.position.y=
+        .15;
+
+    body.castShadow=true;
+
+    device.add(body);
+
+    const wheel=
+        new THREE.Mesh(
+            new THREE.CylinderGeometry(
+                .17,
+                .17,
+                .16,
+                20
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0x101010,
+                metalness:.5
+            })
+        );
+
+    wheel.rotation.z=
+        Math.PI/2;
+
+    wheel.position.set(
+        0,
+        .9,
+        .65
+    );
+
+    device.add(wheel);
+
+    createDevicePorts();
+}
+
+
+/* Anakart */
+
+function buildMotherboard(){
+
+    const board=
+        makeBody(
+            6.5,
+            .24,
+            4.8,
+            0x155a3a
+        );
+
+    board.position.y=
+        -.15;
+
+    for(let i=0;i<8;i++){
+
+        const component=
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    .35,
+                    .22,
+                    .35
+                ),
+                new THREE.MeshStandardMaterial({
+                    color:
+                        i%2===0
+                        ?0x111
+                        :0x777
+                })
+            );
+
+        component.position.set(
+            -2.5+i*.7,
+            .1,
+            -.65
+        );
+
+        device.add(component);
+    }
+
+    createDevicePorts();
+}
+
+
+/* =====================================================
+   CİHAZ LİSTESİ
+===================================================== */
+
+const deviceList=[
+
+    {
+        name:"📱 Telefon",
+        kind:"phone",
+        mode:"both"
+    },
+
+    {
+        name:"📱 Tablet",
+        kind:"tablet",
+        mode:"both"
+    },
+
+    {
+        name:"💻 Laptop",
+        kind:"laptop",
+        mode:"both"
+    },
+
+    {
+        name:"⌚ Akıllı Saat",
+        kind:"watch",
+        mode:"charge"
+    },
+
+    {
+        name:"🔋 Li-ion Pil",
+        kind:"battery",
+        mode:"charge"
+    },
+
+    {
+        name:"🖱️ Mouse",
+        kind:"mouse",
+        mode:"both"
+    },
+
+    {
+        name:"🟩 PC Anakartı",
+        kind:"motherboard",
+        mode:"data"
+    }
+];
+
+
+/* =====================================================
+   KABLOLAR
+===================================================== */
+
+const cableColors={
+
+    Bplus:0xd93434,
+    Bminus:0x222222,
+    Dplus:0xd39d1e,
+    Dminus:0x258bb9
+};
+
+const connectorPositions={
+
+    Bplus:
+        new THREE.Vector3(
+            -1.7,
+            .45,
+            3.8
+        ),
+
+    Bminus:
+        new THREE.Vector3(
+            -.57,
+            .55,
+            3.8
+        ),
+
+    Dplus:
+        new THREE.Vector3(
+            .57,
+            .65,
+            3.8
+        ),
+
+    Dminus:
+        new THREE.Vector3(
+            1.7,
+            .55,
+            3.8
+        )
+};
+
+const connectors={};
+const cables={};
+
+
+/* Kablo ucu */
+
+function createConnector(type){
+
+    const group=
+        new THREE.Group();
+
+    group.position.copy(
+        connectorPositions[type]
+    );
+
+    group.userData.type=
+        type;
+
+    group.userData.connected=
+        false;
+
+    const housing=
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                .7,
+                .32,
+                .45
+            ),
+            new THREE.MeshStandardMaterial({
+                color:
+                    cableColors[type],
+                roughness:.38,
+                metalness:.18
+            })
+        );
+
+    housing.castShadow=true;
+
+    group.add(housing);
+
+
+    const metal=
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                .30,
+                .18,
+                .42
+            ),
+            new THREE.MeshStandardMaterial({
+                color:0xb7babd,
+                metalness:.95,
+                roughness:.12
+            })
+        );
+
+    metal.position.z=
+        -.38;
+
+    group.add(metal);
+
+    scene.add(group);
+
+    connectors[type]=
+        group;
+}
+
+
+for(
+    const type in cableColors
+){
+
+    createConnector(type);
+}
+
+
+/* Kablo oluştur */
+
+function updateCable(type){
+
+    const start=
+        getWorldPosition(
+            connectionPads[type]
+        );
+
+    const end=
+        connectors[type]
+            .position.clone();
+
+    const p1=
+        start.clone().lerp(
+            end,
+            .33
+        );
+
+    const p2=
+        start.clone().lerp(
+            end,
+            .66
+        );
+
+    p1.y-=.45;
+    p2.y+=.12;
+
+    const curve=
+        new THREE.CatmullRomCurve3([
+            start,
+            p1,
+            p2,
+            end
+        ]);
+
+    if(cables[type]){
+
+        scene.remove(
+            cables[type]
+        );
+
+        cables[type]
+            .geometry
+            .dispose();
+
+        cables[type]
+            .material
+            .dispose();
+    }
+
+    const tube=
+        new THREE.TubeGeometry(
+            curve,
+            40,
+            .085,
+            10,
+            false
+        );
+
+    const mesh=
+        new THREE.Mesh(
+            tube,
+            new THREE.MeshStandardMaterial({
+                color:
+                    cableColors[type],
+                roughness:.72,
+                metalness:.05
+            })
+        );
+
+    mesh.castShadow=true;
+
+    scene.add(mesh);
+
+    cables[type]=mesh;
+}
+
+
+function updateAllCables(){
+
+    for(
+        const type in connectors
+    ){
+
+        updateCable(
+            type
+        );
+    }
+}
+
+
+/* =====================================================
+   DÜNYA POZİSYONU
+===================================================== */
+
+function getWorldPosition(
+    object
+){
+
+    const p=
+        new THREE.Vector3();
+
+    object.getWorldPosition(
+        p
+    );
+
+    return p;
+}
+
+
+/* =====================================================
+   YENİ TUR
+===================================================== */
+
+let score=0;
+let connected={};
+
+function newRound(){
+
+    currentDevice=
+        deviceList[
+            Math.floor(
+                Math.random()*
+                deviceList.length
+            )
+        ];
+
+    connected={};
+
+    clearDevice();
+
+    switch(
+        currentDevice.kind
+    ){
+
+        case "phone":
+            buildPhone();
+            break;
+
+        case "tablet":
+            buildTablet();
+            break;
+
+        case "laptop":
+            buildLaptop();
+            break;
+
+        case "watch":
+            buildWatch();
+            break;
+
+        case "battery":
+            buildBattery();
+            break;
+
+        case "mouse":
+            buildMouse();
+            break;
+
+        case "motherboard":
+            buildMotherboard();
+            break;
+    }
+
+
+    document.getElementById(
+        "deviceName"
+    ).textContent=
+        currentDevice.name;
+
+
+    if(
+        currentDevice.mode==="charge"
+    ){
+
+        document.getElementById(
+            "task"
+        ).textContent=
+            "⚡ B+ ve B− bağla";
+    }
+    else if(
+        currentDevice.mode==="data"
+    ){
+
+        document.getElementById(
+            "task"
+        ).textContent=
+            "📁 D+ ve D− bağla";
+    }
+    else{
+
+        document.getElementById(
+            "task"
+        ).textContent=
+            "⚡📁 B+, B−, D+, D− bağla";
+    }
+
+
+    document.getElementById(
+        "message"
+    ).textContent=
+        "Kablo uçlarını doğru temas noktasına tak";
+
+
+    setDisplay(
+        "HAZIR"
+    );
+
+
+    greenLED.material.color.set(
+        0x253529
+    );
+
+    greenLED.material.emissive.set(
+        0x003b0b
+    );
+
+
+    for(
+        const type in connectors
+    ){
+
+        connectors[type]
+            .position.copy(
+                connectorPositions[type]
+            );
+
+        connectors[type]
+            .userData.connected=
+            false;
+    }
+
+
+    for(
+        const type in devicePorts
+    ){
+
+        if(devicePorts[type]){
+
+            devicePorts[type]
+                .material
+                .color
+                .set(0x565b60);
+        }
+    }
+
+
+    updateAllCables();
+}
+
+
+/* =====================================================
+   EKRAN
+===================================================== */
+
+setDisplay(
+    "HAZIR"
+);
+
+
+/* =====================================================
+   BAĞLANTI KONTROL
+===================================================== */
+
+function getRequired(){
+
+    if(
+        currentDevice.mode===
+        "charge"
+    ){
+
+        return[
+            "Bplus",
+            "Bminus"
+        ];
+    }
+
+    if(
+        currentDevice.mode===
+        "data"
+    ){
+
+        return[
+            "Dplus",
+            "Dminus"
+        ];
+    }
+
+    return[
+        "Bplus",
+        "Bminus",
+        "Dplus",
+        "Dminus"
+    ];
+}
+
+
+function checkConnection(
+    type
+){
+
+    const connector=
+        connectors[type];
+
+    const target=
+        devicePorts[type];
+
+    if(!target){
+
+        resetConnector(type);
+        return;
+    }
+
+    const targetPosition=
+        getWorldPosition(
+            target
+        );
+
+    const distance=
+        connector.position
+        .distanceTo(
+            targetPosition
+        );
+
+
+    if(
+        distance<1.05
+    ){
+
+        connector.position.copy(
+            targetPosition
+        );
+
+        connector.userData.connected=
+            true;
+
+        connected[type]=
+            true;
+
+        target.material.color.set(
+            0x29bddb
+        );
+
+
+        document.getElementById(
+            "message"
+        ).textContent=
+            "✓ "+type+
+            " bağlantısı tamam";
+
+
+        updateAllCables();
+
+        checkComplete();
+
+    }
+    else{
+
+        document.getElementById(
+            "message"
+        ).textContent=
+            "✕ Yanlış temas noktası";
+
+        resetConnector(type);
+    }
+}
+
+
+/* =====================================================
+   SIFIRLAMA
+===================================================== */
+
+function resetConnector(
+    type
+){
+
+    connectors[type]
+        .position.copy(
+            connectorPositions[type]
+        );
+
+    connectors[type]
+        .userData.connected=
+            false;
+
+    updateAllCables();
+}
+
+
+/* =====================================================
+   TAMAMLAMA
+===================================================== */
+
+function checkComplete(){
+
+    const needed=
+        getRequired();
+
+    if(
+        !needed.every(
+            type=>connected[type]
+        )
+    )
+        return;
+
+
+    score++;
+
+    document.getElementById(
+        "score"
+    ).textContent=
+        score;
+
+
+    greenLED.material.color.set(
+        0x3df060
+    );
+
+    greenLED.material.emissive.set(
+        0x0b7d1a
+    );
+
+
+    if(
+        currentDevice.mode===
+        "charge"
+    ){
+
+        setDisplay(
+            "⚡ ŞARJ"
+        );
+    }
+
+    else if(
+        currentDevice.mode===
+        "data"
+    ){
+
+        setDisplay(
+            "📁 VERİ"
+        );
+    }
+
+    else{
+
+        setDisplay(
+            "⚡📁 AKTİF"
+        );
+    }
+
+
+    document.getElementById(
+        "message"
+    ).textContent=
+        "🎉 DEVRE TAMAMLANDI!";
+
+
+    setTimeout(
+        newRound,
+        1600
+    );
+}
+
+
+/* =====================================================
+   KABLO SÜRÜKLEME
+===================================================== */
+
+const raycaster=
+    new THREE.Raycaster();
+
+const mouse=
+    new THREE.Vector2();
+
+const dragPlane=
+    new THREE.Plane(
+        new THREE.Vector3(
+            0,
+            1,
+            0
+        ),
+        -.1
+    );
+
+let dragging=null;
+
+let dragOffset=
+    new THREE.Vector3();
+
+
+renderer.domElement
+.addEventListener(
+    "pointerdown",
+    event=>{
+
+        mouse.x=
+            event.clientX/
+            window.innerWidth*
+            2-1;
+
+        mouse.y=
+            -(event.clientY/
+            window.innerHeight)*
+            2+1;
+
+        raycaster.setFromCamera(
+            mouse,
+            camera
+        );
+
+
+        const objects=[];
+
+        for(
+            const type in connectors
+        ){
+
+            connectors[type]
+                .traverse(
+                    child=>{
+
+                        if(
+                            child.isMesh
+                        ){
+
+                            objects.push(
+                                child
+                            );
+                        }
+                    }
+                );
+        }
+
+
+        const hits=
+            raycaster
+            .intersectObjects(
+                objects,
+                true
+            );
+
+
+        if(!hits.length)
+            return;
+
+
+        let selected=
+            hits[0].object;
+
+
+        while(
+            selected.parent &&
+            !selected.userData.type
+        ){
+
+            selected=
+                selected.parent;
+        }
+
+
+        if(
+            !selected.userData.type
+        )
+            return;
+
+
+        if(
+            selected.userData.connected
+        )
+            return;
+
+
+        dragging=
+            selected;
+
+
+        const point=
+            new THREE.Vector3();
+
+
+        if(
+            raycaster.ray
+            .intersectPlane(
+                dragPlane,
+                point
+            )
+        ){
+
+            dragOffset.copy(
+                dragging.position
+            ).sub(
+                point
+            );
+        }
+    }
+);
+
+
+/* hareket */
+
+window.addEventListener(
+    "pointermove",
+    event=>{
+
+        if(!dragging)
+            return;
+
+
+        mouse.x=
+            event.clientX/
+            window.innerWidth*
+            2-1;
+
+        mouse.y=
+            -(event.clientY/
+            window.innerHeight)*
+            2+1;
+
+
+        raycaster.setFromCamera(
+            mouse,
+            camera
+        );
+
+
+        const point=
+            new THREE.Vector3();
+
+
+        if(
+            raycaster.ray
+            .intersectPlane(
+                dragPlane,
+                point
+            )
+        ){
+
+            dragging.position
+                .copy(
+                    point
+                )
+                .add(
+                    dragOffset
+                );
+
+            dragging.position.y=
+                .45;
+
+            updateAllCables();
+        }
+    }
+);
+
+
+/* bırak */
+
+window.addEventListener(
+    "pointerup",
+    ()=>{
+
+        if(!dragging)
+            return;
+
+
+        const type=
+            dragging.userData.type;
+
+
+        checkConnection(
+            type
+        );
+
+
+        dragging=null;
+    }
+);
+
+
+/* =====================================================
+   KAMERA
+===================================================== */
+
+let rotating=false;
+
+let oldX=0;
+let oldY=0;
+
+renderer.domElement
+.addEventListener(
+    "pointerdown",
+    event=>{
+
+        if(dragging)
+            return;
+
+        rotating=true;
+
+        oldX=event.clientX;
+        oldY=event.clientY;
+    }
+);
+
+
+window.addEventListener(
+    "pointermove",
+    event=>{
+
+        if(
+            !rotating ||
+            dragging
+        )
+            return;
+
+
+        const dx=
+            event.clientX-oldX;
+
+        const dy=
+            event.clientY-oldY;
+
+
+        oldX=event.clientX;
+        oldY=event.clientY;
+
+
+        const angle=
+            Math.atan2(
+                camera.position.x,
+                camera.position.z
+            );
+
+        const radius=
+            Math.hypot(
+                camera.position.x,
+                camera.position.z
+            );
+
+
+        const newAngle=
+            angle-dx*.006;
+
+
+        camera.position.x=
+            Math.sin(
+                newAngle
+            )*radius;
+
+
+        camera.position.z=
+            Math.cos(
+                newAngle
+            )*radius;
+
+
+        camera.position.y+=
+            dy*.025;
+
+
+        camera.position.y=
+            Math.max(
+                3,
+                Math.min(
+                    11,
+                    camera.position.y
+                )
+            );
+
+
+        camera.lookAt(
+            0,
+            1,
+            0
+        );
+    }
+);
+
+
+window.addEventListener(
+    "pointerup",
+    ()=>{
+        rotating=false;
+    }
+);
+
+
+/* =====================================================
+   ZOOM
+===================================================== */
+
+renderer.domElement
+.addEventListener(
+    "wheel",
+    event=>{
+
+        event.preventDefault();
+
+        const dir=
+            camera.position
+            .clone()
+            .normalize();
+
+        camera.position.add(
+            dir.multiplyScalar(
+                event.deltaY*.004
+            )
+        );
+
+
+        const distance=
+            camera.position.length();
+
+
+        if(distance<7)
+            camera.position
+                .setLength(7);
+
+        if(distance>20)
+            camera.position
+                .setLength(20);
+
+
+        camera.lookAt(
+            0,
+            1,
+            0
+        );
+    },
+    {
+        passive:false
+    }
+);
+
+
+/* =====================================================
+   BUTON
+===================================================== */
+
+document.getElementById(
+    "newRound"
+)
+.addEventListener(
+    "click",
+    ()=>{
+
+        score=0;
+
+        document.getElementById(
+            "score"
+        ).textContent="0";
+
+        newRound();
+    }
+);
+
+
+/* =====================================================
+   RESIZE
+===================================================== */
+
+window.addEventListener(
+    "resize",
+    ()=>{
+
+        camera.aspect=
+            window.innerWidth/
+            window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+    }
+);
+
+
+/* =====================================================
+   BAŞLAT
+===================================================== */
+
+newRound();
+
+document.getElementById(
+    "loading"
+).style.display="none";
+
+
+/* =====================================================
+   ANİMASYON
+===================================================== */
+
+function animate(){
+
+    requestAnimationFrame(
+        animate
+    );
+
+    renderer.render(
+        scene,
+        camera
+    );
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
+```
